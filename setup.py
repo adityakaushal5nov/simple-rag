@@ -30,7 +30,7 @@ setuptools.setup(
         "sentence-transformers",
         "transformers",
         "requests",
-        "google-generativeai",
+        "google-genai",
         "rank_bm25",
         "pdftotext",
     ],
