@@ -1,2 +1,2 @@
 [build-system]
-requires = ["setuptools", "wheel", "google-generativeai", "rank-bm25", "requests", "sentence-transformers", "google-generativeai"]
+requires = ["setuptools", "wheel", "google-genai", "rank-bm25", "requests", "sentence-transformers"]
