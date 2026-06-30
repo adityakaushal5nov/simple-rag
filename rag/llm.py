@@ -3,8 +3,6 @@ import os
 import traceback
 from abc import ABC
 
-import google.api_core.exceptions
-import google.generativeai as genai
 import requests
 
 
@@ -24,43 +22,45 @@ class GeminiLLM(BaseLLM):
     def __init__(self, *args, **kwargs):
         """Initialize the Gemini language model.
         - api_key: str: The API key for the Gemini API.
+        - model_name: str: The Gemini model to use.
         """
         super().__init__(*args, **kwargs)
-        GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or kwargs.get("api_key")
-        if not GOOGLE_API_KEY:
+        from google import genai
+        from google.genai import types
+
+        api_key = os.getenv("GOOGLE_API_KEY") or kwargs.get("api_key")
+        if not api_key:
             raise ValueError(
                 "Please set GOOGLE_API_KEY environment variable or set api_key."
             )
-        genai.configure(api_key=GOOGLE_API_KEY)
-        generation_config = genai.GenerationConfig(
-            temperature=0.0,
-        )
-        self.model = genai.GenerativeModel(
-            "text-davinci-003", generation_config=generation_config
-        )
+        self.model_name = kwargs.get("model_name", "gemini-2.0-flash")
+        self.client = genai.Client(api_key=api_key)
+        self._generate_config = types.GenerateContentConfig(temperature=0.0)
 
     def generate(self, prompt: str, **kwargs) -> str:
         """Generate text from the model.
         - prompt: str: The prompt to generate text from.
         - retried: int: The number of times the request has been retried.
         """
+        from google.genai.errors import ServerError
+
         retried = kwargs.get("retried", 0)
         if retried < 0:
             raise Exception("Retried too many times.")
         try:
-            response = self.model.generate_content(prompt)
-            if response.candidates and response.candidates[0].content.parts:
-                return response.candidates[0].content.parts[0].text
-            else:
-                return response.text
-        except google.api_core.exceptions.InternalServerError:
+            response = self.client.models.generate_content(
+                model=kwargs.get("model_name", self.model_name),
+                contents=prompt,
+                config=self._generate_config,
+            )
+            return response.text or ""
+        except ServerError:
             print("Retrying 500...", retried)
-            return self.generate(prompt, kwargs=kwargs)
+            return self.generate(prompt, retried=retried)
         except Exception:
             print("An error occurred!")
             traceback.print_exc()
-            kwargs["retried"] = retried - 1
-            return self.generate(prompt, kwargs=kwargs)
+            return self.generate(prompt, retried=retried - 1)
 
     def chat(self, prompt: str, **kwargs) -> str:
         return self.generate(prompt, **kwargs)
